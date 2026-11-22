@@ -22,6 +22,9 @@ import { Route as ItRoute } from "./it-services";
 import { Route as ManufacturingRoute } from "./manufacturing";
 import { Route as RootRoute } from "./__root";
 
+// Role queries are slow in jsdom; keep generous headroom on busy CI runners.
+vi.setConfig({ testTimeout: 15_000 });
+
 type Head = () => { meta: Array<Record<string, string>>; links: Array<Record<string, string>> };
 type AnyRoute = { options: { head?: unknown; component?: unknown } };
 

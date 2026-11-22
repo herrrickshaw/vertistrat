@@ -95,11 +95,14 @@ describe("ContactForm", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("shows only the first error per field", () => {
+  it("shows only the first error per field (not the later one)", () => {
     render(<ContactForm />);
+    // too long AND not a valid email: two zod issues on the same field
     fill({ ...GOOD, email: `${"e".repeat(260)}-bad` });
     submit();
     expect(document.querySelectorAll("#email-err")).toHaveLength(1);
+    expect(screen.queryByText("Enter a valid email")).toBeNull();
+    expect(document.querySelector("#email-err")).toHaveTextContent(/at most 255/i);
   });
 
   it("clears previous errors once the form becomes valid, and shows the success state (form disabled, nothing sent)", async () => {
@@ -126,5 +129,17 @@ describe("ContactForm", () => {
     expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument();
     expect(screen.getByLabelText(/^Name/)).toHaveValue("");
     expect(screen.queryByText("Please enter your name")).toBeNull();
+  });
+
+  it("does not show stale errors after a successful send followed by 'Send another'", async () => {
+    render(<ContactForm />);
+    submit(); // produce errors first
+    expect(screen.getByText("Please enter your name")).toBeInTheDocument();
+    fill(GOOD);
+    submit();
+    fireEvent.click(await screen.findByRole("button", { name: "Send another" }));
+    expect(screen.queryByText("Please enter your name")).toBeNull();
+    expect(screen.queryByText(/at least 10 characters/)).toBeNull();
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-invalid", "false");
   });
 });

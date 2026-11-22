@@ -82,8 +82,10 @@ describe("reportLovableError", () => {
     expect(runtime.mock.calls[0]![0].message).toBe("db down");
     reportLovableError({ message: "", code: 1 });
     expect(runtime.mock.calls[1]![0].message).toBe('{"message":"","code":1}');
+    reportLovableError({ message: "x" }); // one-character messages are still used
+    expect(runtime.mock.calls[2]![0].message).toBe("x");
     reportLovableError({ message: 5 });
-    expect(runtime.mock.calls[2]![0].message).toBe('{"message":5}');
+    expect(runtime.mock.calls[3]![0].message).toBe('{"message":5}');
   });
 
   it("JSON-serialises other values, truncated to 2000 chars", () => {

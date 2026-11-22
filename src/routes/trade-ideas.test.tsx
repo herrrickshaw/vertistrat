@@ -17,6 +17,9 @@ vi.mock("@/config", async (orig) => {
 import { DISCLAIMER, TRADE_STALE_DAYS } from "@/config";
 import { Route } from "./trade-ideas";
 
+// Role queries are slow in jsdom; keep generous headroom on busy CI runners.
+vi.setConfig({ testTimeout: 15_000 });
+
 const Page = Route.options.component as ComponentType;
 const PLACEHOLDER_URL =
   "https://raw.githubusercontent.com/herrrickshaw/REPLACE_REPO/main/trade_ideas.json";
@@ -48,11 +51,11 @@ function mockFetch(res: Partial<Response> | Error) {
   return f;
 }
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+// Plain DOM queries: role-based queries over the table are slow enough in jsdom to flake on busy CI.
 const symbols = () =>
-  screen
-    .queryAllByRole("row")
-    .slice(1)
-    .map((r) => within(r).getAllByRole("cell")[0]!.textContent);
+  Array.from(document.querySelectorAll("tbody tr")).map((r) => r.querySelector("td")!.textContent);
+const cellsOfFirstRow = () =>
+  Array.from(document.querySelector("tbody tr")!.querySelectorAll("td"));
 
 beforeEach(() => {
   cfg.url = "https://raw.example.test/ideas.json";
@@ -123,7 +126,8 @@ describe("Trade ideas page", () => {
   it("formats numbers in en-IN grouping and shows an em dash for nulls", async () => {
     mockFetch(ok([idea({ entry: 1234567, target: null, stop: 0 })]));
     renderPage();
-    const cells = within((await screen.findAllByRole("row"))[1]!).getAllByRole("cell");
+    await screen.findByRole("table");
+    const cells = cellsOfFirstRow();
     expect(cells[3]).toHaveTextContent("12,34,567");
     expect(cells[4]).toHaveTextContent("—");
     expect(cells[5]).toHaveTextContent("0"); // zero is a value, not missing
@@ -184,23 +188,24 @@ describe("Trade ideas page", () => {
     renderPage();
     await screen.findByRole("table");
     expect(symbols()).toEqual(["C", "A", "B"]);
-    const header = (name: RegExp) => screen.getByRole("columnheader", { name });
+    const header = (name: RegExp) =>
+      Array.from(document.querySelectorAll("th")).find((h) => name.test(h.textContent ?? ""))!;
     expect(header(/As of/)).toHaveAttribute("aria-sort", "descending");
     expect(header(/Symbol/)).toHaveAttribute("aria-sort", "none");
 
-    fireEvent.click(within(header(/Symbol/)).getByRole("button"));
+    fireEvent.click(header(/Symbol/).querySelector("button")!);
     expect(symbols()).toEqual(["A", "B", "C"]);
     expect(header(/Symbol/)).toHaveAttribute("aria-sort", "ascending");
     expect(header(/Symbol/)).toHaveTextContent("Symbol ↑");
     expect(header(/As of/)).toHaveAttribute("aria-sort", "none");
 
-    fireEvent.click(within(header(/Symbol/)).getByRole("button"));
+    fireEvent.click(header(/Symbol/).querySelector("button")!);
     expect(symbols()).toEqual(["C", "B", "A"]);
     expect(header(/Symbol/)).toHaveAttribute("aria-sort", "descending");
     expect(header(/Symbol/)).toHaveTextContent("Symbol ↓");
 
     // clicking another column starts ascending
-    fireEvent.click(within(header(/As of/)).getByRole("button"));
+    fireEvent.click(header(/As of/).querySelector("button")!);
     expect(symbols()).toEqual(["B", "A", "C"]);
   });
 

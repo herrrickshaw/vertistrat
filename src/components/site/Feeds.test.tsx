@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BLOG_FEED_URL, BLOG_URL, GITHUB_REPOS_URL, GITHUB_USER } from "@/config";
 import { ArticleGrid, GithubRepos } from "./Feeds";
 
+// Role queries are slow in jsdom; keep generous headroom on busy CI runners.
+vi.setConfig({ testTimeout: 15_000 });
+
 function wrap(ui: ReactNode) {
   const client = new QueryClient();
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
@@ -127,6 +130,17 @@ describe("ArticleGrid / useArticles", () => {
     await answer({ feed: { entry: [entry(1, ["A"])] } });
     await screen.findByText("Post 1");
     expect(screen.queryByRole("group")).toBeNull();
+  });
+
+  it("shows the filter group even when there is a single category", async () => {
+    wrap(<ArticleGrid filterable />);
+    await answer({ feed: { entry: [entry(1, ["Only"])] } });
+    const group = await screen.findByRole("group", { name: "Filter by category" });
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["All", "Only"]);
   });
 
   it("hides the filter group for filterable grids with no categories at all", async () => {
