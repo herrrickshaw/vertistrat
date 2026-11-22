@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Vite 8 needs Node >= 22.12 (or 20.19+); 22 is the current LTS.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # .ts/.tsx only: avoids non-code files (e.g. a README) under src/ being parsed for coverage.
+      - run: npm test -- --coverage --coverage.reporter=lcov --coverage.reporter=text-summary --coverage.include='src/**/*.{ts,tsx}'
+
+      - run: npm run build
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/lcov.info
+          fail_ci_if_error: false
